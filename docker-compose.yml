@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    container_name: simple-money-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: simplemoney
+      POSTGRES_PASSWORD: simplemoney_dev
+      POSTGRES_DB: simplemoney
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
