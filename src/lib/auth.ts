@@ -8,6 +8,8 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 10,
+    disableSignUp: true
   },
   plugins: [nextCookies()], // precisa ser o último plugin
 });
+
