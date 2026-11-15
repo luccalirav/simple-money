@@ -2,11 +2,15 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatarCentavos } from "@/lib/dinheiro";
 import { exigirPerfilAtivo } from "@/lib/sessao";
-import { adicionarLinha, excluirLinha, limparRascunho, salvarLinha } from "./actions";
+import { hojeISO } from "@/lib/transacoes";
+import { adicionarLinha, excluirLinha, lancarComoTransacoes, limparRascunho, salvarLinha } from "./actions";
 
 const ERROS = new Map([
   ["nome", "Informe o nome da linha (até 100 caracteres)."],
   ["valor", "Valor inválido. Use o formato 150,00."],
+  ["data", "Data inválida."],
+  ["conta", "Conta não encontrada."],
+  ["vazio", "Nenhuma linha com valor para lançar."],
 ]);
 
 function emReais(centavos: number) {
@@ -22,10 +26,10 @@ export default async function RascunhoPage({
   const { erro } = await searchParams;
   const mensagemErro = erro ? ERROS.get(erro) : undefined;
 
-  const linhas = await prisma.draftEntry.findMany({
-    where: { profileId: perfil.id },
-    orderBy: { createdAt: "asc" },
-  });
+  const [linhas, contas] = await Promise.all([
+    prisma.draftEntry.findMany({ where: { profileId: perfil.id }, orderBy: { createdAt: "asc" } }),
+    prisma.bankAccount.findMany({ where: { profileId: perfil.id }, orderBy: { createdAt: "asc" } }),
+  ]);
   const total = linhas.reduce((soma, l) => soma + l.amountCents, 0);
 
   const comAcumulado = linhas.map((l, i) => ({
@@ -68,6 +72,29 @@ export default async function RascunhoPage({
         <input name="valor" placeholder="Valor" inputMode="decimal" className="w-28 rounded border p-2 text-right text-sm" />
         <button className="rounded bg-black px-3 py-2 text-sm text-white">Adicionar</button>
       </form>
+
+      {linhas.some((l) => l.amountCents > 0) &&
+        (contas.length === 0 ? (
+          <p className="text-sm text-gray-600">
+            Para lançar como transações, cadastre uma <Link href="/contas" className="underline">conta bancária</Link>.
+          </p>
+        ) : (
+          <form action={lancarComoTransacoes} className="flex flex-col gap-2 rounded border p-4">
+            <h2 className="font-medium">Passar a limpo</h2>
+            <p className="text-xs text-gray-600">
+              Cada linha com valor vira uma despesa na conta escolhida, o saldo é atualizado e as linhas saem do rascunho.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <select name="contaId" className="min-w-0 flex-1 rounded border p-2 text-sm">
+                {contas.map((c) => (
+                  <option key={c.id} value={c.id}>{c.bankName}{c.nickname ? ` · ${c.nickname}` : ""}</option>
+                ))}
+              </select>
+              <input name="data" type="date" defaultValue={hojeISO()} required className="rounded border p-2 text-sm" />
+              <button className="rounded bg-black px-3 py-2 text-sm text-white">Lançar como transações</button>
+            </div>
+          </form>
+        ))}
 
       <div className="flex items-center justify-between border-t pt-4">
         <p className="text-lg">

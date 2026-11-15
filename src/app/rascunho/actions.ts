@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { reaisParaCentavos } from "@/lib/dinheiro";
 import { exigirPerfilAtivo } from "@/lib/sessao";
+import { parseData } from "@/lib/transacoes";
 
 function lerLinha(formData: FormData) {
   const nome = String(formData.get("nome") ?? "").trim();
@@ -43,4 +44,41 @@ export async function limparRascunho() {
   const { perfil } = await exigirPerfilAtivo();
   await prisma.draftEntry.deleteMany({ where: { profileId: perfil.id } });
   redirect("/rascunho");
+}
+
+// "Passa a limpo": cada linha com valor vira uma despesa na conta escolhida
+// e sai do rascunho. Linhas sem valor (0) ficam no caderno.
+export async function lancarComoTransacoes(formData: FormData) {
+  const { perfil } = await exigirPerfilAtivo();
+
+  const contaId = String(formData.get("contaId") ?? "");
+  const data = parseData(String(formData.get("data") ?? ""));
+  if (!data) redirect("/rascunho?erro=data");
+
+  const conta = await prisma.bankAccount.findFirst({ where: { id: contaId, profileId: perfil.id } });
+  if (!conta) redirect("/rascunho?erro=conta");
+
+  const linhas = await prisma.draftEntry.findMany({
+    where: { profileId: perfil.id, amountCents: { gt: 0 } },
+  });
+  if (linhas.length === 0) redirect("/rascunho?erro=vazio");
+
+  const total = linhas.reduce((soma, l) => soma + l.amountCents, 0);
+  await prisma.$transaction([
+    prisma.transaction.createMany({
+      data: linhas.map((l) => ({
+        bankAccountId: conta.id,
+        type: "EXPENSE" as const,
+        amountCents: l.amountCents,
+        description: l.label,
+        date: data,
+      })),
+    }),
+    prisma.bankAccount.update({
+      where: { id: conta.id },
+      data: { balanceCents: { decrement: total } },
+    }),
+    prisma.draftEntry.deleteMany({ where: { id: { in: linhas.map((l) => l.id) } } }),
+  ]);
+  redirect("/transacoes");
 }
