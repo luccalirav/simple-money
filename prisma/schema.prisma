@@ -18,6 +18,11 @@ enum BankAccountType {
   CASH
 }
 
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String
@@ -84,6 +89,8 @@ model Profile {
   isMain       Boolean       @default(false)
   createdAt    DateTime      @default(now())
   bankAccounts BankAccount[]
+  draftEntries DraftEntry[]
+  bills        Bill[]
 
   @@index([userId])
 }
@@ -97,6 +104,47 @@ model BankAccount {
   type         BankAccountType @default(CHECKING)
   balanceCents Int             @default(0)
   createdAt    DateTime        @default(now())
+  transactions Transaction[]
 
   @@index([profileId])
+}
+
+model Transaction {
+  id            String          @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount     @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  type          TransactionType
+  // Sempre positivo; o sinal vem do tipo (INCOME soma, EXPENSE subtrai)
+  amountCents   Int
+  description   String
+  date          DateTime        @db.Date
+  createdAt     DateTime        @default(now())
+
+  @@index([bankAccountId, date])
+}
+
+// Rascunho: linhas livres tipo caderno/planilha, com total somado
+model DraftEntry {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  label       String
+  amountCents Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([profileId, createdAt])
+}
+
+// Conta a pagar: lembrete com data de vencimento
+model Bill {
+  id          String    @id @default(cuid())
+  profileId   String
+  profile     Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  description String
+  amountCents Int
+  dueDate     DateTime  @db.Date
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([profileId, dueDate])
 }
