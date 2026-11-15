@@ -10,7 +10,7 @@ const ERROS = new Map([
   ["valor", "Valor inválido. Use o formato 150,00."],
   ["data", "Data inválida."],
   ["conta", "Conta não encontrada."],
-  ["vazio", "Nenhuma linha com valor para lançar."],
+  ["vazio", "Marque ao menos uma linha com valor para lançar."],
 ]);
 
 function emReais(centavos: number) {
@@ -50,6 +50,15 @@ export default async function RascunhoPage({
         {comAcumulado.length === 0 && <p className="text-sm text-gray-600">Caderno vazio. Anote a primeira linha abaixo.</p>}
         {comAcumulado.map((l) => (
           <div key={l.id} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="linha"
+              value={l.id}
+              form="passar-a-limpo"
+              disabled={l.amountCents <= 0}
+              aria-label={`Selecionar ${l.label} para lançar`}
+              className="h-4 w-4"
+            />
             <form action={salvarLinha} className="flex flex-1 items-center gap-2">
               <input type="hidden" name="linhaId" value={l.id} />
               <input name="nome" defaultValue={l.label} maxLength={100} required className="min-w-0 flex-1 rounded border p-1 text-sm" />
@@ -79,10 +88,10 @@ export default async function RascunhoPage({
             Para lançar como transações, cadastre uma <Link href="/contas" className="underline">conta bancária</Link>.
           </p>
         ) : (
-          <form action={lancarComoTransacoes} className="flex flex-col gap-2 rounded border p-4">
+          <form id="passar-a-limpo" action={lancarComoTransacoes} className="flex flex-col gap-2 rounded border p-4">
             <h2 className="font-medium">Passar a limpo</h2>
             <p className="text-xs text-gray-600">
-              Cada linha com valor vira uma despesa na conta escolhida, o saldo é atualizado e as linhas saem do rascunho.
+              Marque as linhas que quer lançar. Cada uma vira uma despesa na conta escolhida, o saldo é atualizado e as linhas marcadas saem do rascunho.
             </p>
             <div className="flex flex-wrap gap-2">
               <select name="contaId" className="min-w-0 flex-1 rounded border p-2 text-sm">

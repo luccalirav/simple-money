@@ -46,8 +46,8 @@ export async function limparRascunho() {
   redirect("/rascunho");
 }
 
-// "Passa a limpo": cada linha com valor vira uma despesa na conta escolhida
-// e sai do rascunho. Linhas sem valor (0) ficam no caderno.
+// "Passa a limpo": cada linha marcada vira uma despesa na conta escolhida
+// e sai do rascunho. As demais ficam no caderno.
 export async function lancarComoTransacoes(formData: FormData) {
   const { perfil } = await exigirPerfilAtivo();
 
@@ -58,8 +58,10 @@ export async function lancarComoTransacoes(formData: FormData) {
   const conta = await prisma.bankAccount.findFirst({ where: { id: contaId, profileId: perfil.id } });
   if (!conta) redirect("/rascunho?erro=conta");
 
+  // Só as linhas marcadas (e do perfil ativo, e com valor)
+  const ids = formData.getAll("linha").map(String);
   const linhas = await prisma.draftEntry.findMany({
-    where: { profileId: perfil.id, amountCents: { gt: 0 } },
+    where: { id: { in: ids }, profileId: perfil.id, amountCents: { gt: 0 } },
   });
   if (linhas.length === 0) redirect("/rascunho?erro=vazio");
 
